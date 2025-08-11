@@ -28,7 +28,7 @@ docker run -it -p 8007:8000 -v C:/ERP/Report:/app/metadata mcp1c_metadata:latest
 
 
 **Инструкция для ИИ:**  
-If you use configuration metadata, check its existence and structure using 'mcp1c_metadata'  
+If you use configuration metadata, check its existence and structure using 'metadatasearch'  
 
 **Пример mcp.json:**  
 {  
