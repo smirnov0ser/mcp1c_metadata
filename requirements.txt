@@ -1,0 +1,6 @@
+fastmcp
+python-dotenv
+beautifulsoup4
+chardet
+fastapi
+uvicorn[standard] 
