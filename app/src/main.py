@@ -25,17 +25,8 @@ logger.info("Env Loaded...")
 # --- Configuration from Environment Variables ---
 USESSE = os.getenv("USESSE", "false").lower() == "true"
 
-# Get paths from environment variables
-METADATA_PATH = os.getenv("METADATA_PATH", "./data/metadata")
-
-if not METADATA_PATH:
-    logger.critical("METADATA_PATH environment variable must be set. Application will exit.")
-    sys.exit("METADATA_PATH environment variable must be set.")
-
-
-
 # Initialize MetadataReturner
-metadata_returner = MetadataReturner(METADATA_PATH+"/ОтчетПоКонфигурации.txt")
+metadata_returner = MetadataReturner("/app/metadata/ОтчетПоКонфигурации.txt")
 
 
 # Initialize FastMCP server at module level
@@ -45,7 +36,7 @@ logger.info("FastMCP server initialized...")
 # Register tools
 @mcp.tool()
 def metadatasearch(query: str, find_usages: bool = False, limit: int = 5):
-    """Search in XML metadata files of 1C configuration. Example: 'Справочники.Номенклатура'. 
+    """Search metadata files of 1C configuration. Example: 'Справочники.Номенклатура'. 
     If find_usages is False (default), returns the matched objects with their full hierarchy directly. 
     If True, it finds where these objects are used in other parts of the metadata tree.
     Limit is the maximum number of objects to return. Default is 5.""" 
