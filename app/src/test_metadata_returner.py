@@ -1,5 +1,5 @@
-import os
-from MetadataReturner import MetadataReturner
+from metadata_returner import MetadataReturner
+
 
 def test_search_metadata():
     parser = MetadataReturner("C:\AI\mcp1c_metadata_files")
@@ -9,7 +9,12 @@ def test_search_metadata():
     print(parser.to_json(configs))
     # Вызов поиска по первой конфигурации (всегда один вызов)
     config_name = "упп"
-    results = parser.search_metadata("Документ.КоммерческоеПредложение", find_usages=False, limit=5, config=config_name)
+    results = parser.search_metadata(
+        "Документ.КоммерческоеПредложение",
+        find_usages=False,
+        limit=5,
+        config=config_name,
+    )
     print("SEARCH RESULTS:")
     print(parser.to_json(results))
 
