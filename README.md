@@ -62,7 +62,7 @@ python .\app\src\main.py
 - **MCP_HOST**: хост MCP-сервера (по умолчанию `0.0.0.0`)
 - **MCP_PORT**: порт MCP-сервера (по умолчанию `8000`)
 - **MCP_PATH**: URL-путь MCP (по умолчанию `/mcp`)
-- **USESSE**: `true|false` — транспорт `sse` или `streamable-http` (по умолчанию `false` → `streamable-http`)
+- **USE_SSE**: `true|false` — транспорт `sse` или `streamable-http` (по умолчанию `false` → `streamable-http`)
 - Логи:
   - **LOG_LEVEL**: `DEBUG|INFO|WARNING|ERROR` (по умолчанию `INFO`)
   - **LOG_TO_FILE**: `true|false` (по умолчанию `true`)

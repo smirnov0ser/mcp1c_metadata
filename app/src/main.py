@@ -83,7 +83,7 @@ logger = _configure_logging_from_env()
 logger.info("Environment loaded and logging configured")
 
 # --- Configuration from Environment Variables ---
-USESSE = os.getenv("USESSE", "false").lower() == "true"
+USE_SSE = os.getenv("USE_SSE", "false").lower() == "true"
 
 # Initialize MetadataReturner with split input/dist directories
 metadata_returner = MetadataReturner(
@@ -119,7 +119,7 @@ def metadatasearch(
 
 
 if __name__ == "__main__":
-    transport = "sse" if USESSE else "streamable-http"
+    transport = "sse" if USE_SSE else "streamable-http"
     host = os.getenv("MCP_HOST", "0.0.0.0")
     port = int(os.getenv("MCP_PORT", "8000"))
     path = os.getenv("MCP_PATH", "/mcp")
