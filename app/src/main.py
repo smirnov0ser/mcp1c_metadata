@@ -25,8 +25,8 @@ logger.info("Env Loaded...")
 # --- Configuration from Environment Variables ---
 USESSE = os.getenv("USESSE", "false").lower() == "true"
 
-# Initialize MetadataReturner
-metadata_returner = MetadataReturner("/app/metadata/ОтчетПоКонфигурации.txt")
+# Initialize MetadataReturner (no file arguments needed)
+metadata_returner = MetadataReturner()
 
 
 # Initialize FastMCP server at module level
@@ -35,23 +35,13 @@ logger.info("FastMCP server initialized...")
 
 # Register tools
 @mcp.tool()
-def metadatasearch(query: str, find_usages: bool = False, limit: int = 5):
+def metadatasearch(query: str, find_usages: bool = False, limit: int = 5, config: str = None):
     """Search metadata files of 1C configuration. Example: 'Справочники.Номенклатура'. 
     If find_usages is False (default), returns the matched objects with their full hierarchy directly. 
     If True, it finds where these objects are used in other parts of the metadata tree.
     Limit is the maximum number of objects to return. Default is 5.""" 
-    try:
-        results = metadata_returner.search_metadata(query, find_usages=find_usages, limit=limit)
-        return {
-            "status": "success",
-            "data": {"results": results}
-        }
-    except Exception as e:
-        logger.error(f"Error in metadatasearch: {str(e)}")
-        return {
-            "status": "error",
-            "error": str(e)
-        }
+    result = metadata_returner.search_metadata(query, find_usages=find_usages, limit=limit, config=config)
+    return result
 
 
 if __name__ == "__main__":
