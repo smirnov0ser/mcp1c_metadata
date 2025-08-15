@@ -4,7 +4,7 @@ import os
 import time
 from typing import List, Dict, Any, Optional
 
-# Logger will be set in __init__ method
+# Logger is created in __init__ method
 
 class MetadataReturner:
     """
@@ -22,10 +22,9 @@ class MetadataReturner:
         self,
         metadata_input_dir: Optional[str] = None,
         metadata_dist_dir: Optional[str] = None,
-        logger: Optional[logging.Logger] = None,
     ):
-        # Use provided logger or create default one
-        self.logger = logger or logging.getLogger(__name__)
+        # Create default logger - use root logger to avoid conflicts
+        self.logger = logging.getLogger()
         
         # Only JSON-based metadata is supported
         self.singular_to_plural = self._get_type_mappings()
@@ -37,14 +36,29 @@ class MetadataReturner:
 
         # Discover available prepared metadata files
         self.metadata_dir = self._get_input_metadata_dir()
+        self.logger.info(f"Каталог метаданных: {self.metadata_dir}")
+        
         self.base_name_to_path: Dict[str, str] = self._discover_metadata_files(
             [self.metadata_dir]
         )
+        self.logger.info(f"Найдено файлов метаданных: {len(self.base_name_to_path)}")
+        if self.base_name_to_path:
+            self.logger.info(f"Файлы: {list(self.base_name_to_path.keys())}")
+        
         self.loaded_json_by_base: Dict[str, Dict[str, Any]] = {}
 
         # Build and persist configs index for fast listing
         self.config_index_path = self._get_config_index_path()
-        self.precomputed_config_summaries = self._build_and_persist_config_index()
+        self.logger.info(f"Путь к индексу конфигураций: {self.config_index_path}")
+        
+        try:
+            self.precomputed_config_summaries = self._build_and_persist_config_index()
+            self.logger.info(f"Индекс конфигураций построен успешно, найдено: {len(self.precomputed_config_summaries)}")
+        except Exception as e:
+            self.logger.warning(f"Не удалось построить индекс конфигураций: {e}")
+            self.precomputed_config_summaries = []
+        
+        self.logger.info("MetadataReturner initialization completed")
 
     def _get_type_mappings(self) -> Dict[str, str]:
         return {
@@ -70,22 +84,43 @@ class MetadataReturner:
         3) Иначе локальный путь `./metadata_src` (относительно корня проекта)
         """
         if self.user_metadata_input_dir:
+            self.logger.debug(f"Используется каталог из параметра: {self.user_metadata_input_dir}")
             return self.user_metadata_input_dir
 
         env_dir = os.getenv("INPUT_METADATA_DIR")
         if env_dir:
+            self.logger.debug(f"Используется каталог из переменной окружения: {env_dir}")
             return env_dir
 
         project_root = os.path.abspath(
             os.path.join(os.path.dirname(__file__), "..", "..")
         )
-        return os.path.join(project_root, "metadata_src")
+        default_dir = os.path.join(project_root, "metadata_src")
+        self.logger.debug(f"Используется каталог по умолчанию: {default_dir}")
+        self.logger.debug(f"Текущий рабочий каталог: {os.getcwd()}")
+        self.logger.debug(f"Путь к файлу: {__file__}")
+        self.logger.debug(f"Корень проекта: {project_root}")
+        
+        # Check if directory exists
+        if os.path.exists(default_dir):
+            self.logger.info(f"Каталог по умолчанию существует: {default_dir}")
+        else:
+            self.logger.warning(f"Каталог по умолчанию НЕ существует: {default_dir}")
+            
+        return default_dir
 
     def _discover_metadata_files(self, dirs: List[str]) -> Dict[str, str]:
         mapping: Dict[str, str] = {}
         index_filename = 'metadata_configs_index.json'
         for d in dirs:
             try:
+                if not os.path.exists(d):
+                    self.logger.warning(f"Каталог не существует: {d}")
+                    continue
+                if not os.path.isdir(d):
+                    self.logger.warning(f"Путь не является каталогом: {d}")
+                    continue
+                    
                 for entry in os.listdir(d):
                     if entry.startswith('.'):
                         continue
@@ -96,9 +131,16 @@ class MetadataReturner:
                             # Prefer first occurrence; later duplicates are ignored
                             if base not in mapping:
                                 mapping[base] = full_path
-            except FileNotFoundError:
+            except (FileNotFoundError, PermissionError, OSError) as e:
+                self.logger.warning(f"Ошибка при доступе к каталогу {d}: {e}")
                 continue
         # Do not raise here; handled gracefully upstream
+        self.logger.debug(f"Найдено файлов метаданных: {len(mapping)}")
+        if mapping:
+            self.logger.debug(f"Файлы: {list(mapping.keys())}")
+        else:
+            self.logger.warning("НЕ НАЙДЕНО файлов метаданных!")
+            
         return mapping
 
     def _get_config_index_path(self) -> str:
@@ -124,6 +166,13 @@ class MetadataReturner:
 
     def _build_and_persist_config_index(self) -> List[Dict[str, Any]]:
         summaries: List[Dict[str, Any]] = []
+        
+        self.logger.info(f"Начинаю построение индекса конфигураций. Доступно файлов: {len(self.base_name_to_path)}")
+        
+        if not self.base_name_to_path:
+            self.logger.warning("Нет доступных файлов метаданных для построения индекса")
+            return summaries
+            
         for base_name, path in self.base_name_to_path.items():
             try:
                 data = self.loaded_json_by_base.get(base_name)
@@ -174,8 +223,28 @@ class MetadataReturner:
         # Reset last info
         self._last_info = None
 
+        self.logger.info(f"=== search_metadata called ===")
+        self.logger.info(f"Query: {query}, find_usages: {find_usages}, limit: {limit}, config: {config}")
+        self.logger.info(f"Available metadata files: {len(self.base_name_to_path)}")
+
         result: Dict[str, Any] = {}
         try:
+            # Check if we have any metadata files available
+            if not self.base_name_to_path:
+                self.logger.error("No metadata files available")
+                result = {
+                    "_call_params": {
+                        "query": query,
+                        "find_usages": find_usages,
+                        "limit": limit,
+                        "config": config,
+                        "timestamp": time.time()
+                    },
+                    "status": "error", 
+                    "result": {"text": "Нет доступных файлов метаданных. Убедитесь, что в каталоге ./metadata_src есть JSON-файлы с метаданными конфигураций 1С."}
+                }
+                return result
+                
             # Select target configuration file
             target_base = self._resolve_config_base(config)
             if not target_base:
@@ -553,6 +622,9 @@ class MetadataReturner:
         summaries = self.get_config_summaries()
         summaries_by_base: Dict[str, Dict[str, Any]] = {s.get('file'): s for s in summaries if isinstance(s, dict) and s.get('file')}
         file_to_base: Dict[str, str] = {os.path.basename(path).lower(): base for base, path in self.base_name_to_path.items()}
+        
+        self.logger.debug(f"Доступные конфигурации: {list(self.base_name_to_path.keys())}")
+        self.logger.debug(f"Запрошенная конфигурация: {config}")
 
         def build_available() -> List[Dict[str, Any]]:
             return [

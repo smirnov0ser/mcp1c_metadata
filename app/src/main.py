@@ -3,6 +3,7 @@ Main entry point for the MCP server using FastMCP.
 """
 import logging
 import os
+import sys
 from logging.handlers import RotatingFileHandler, TimedRotatingFileHandler
 from dotenv import load_dotenv
 from fastmcp import FastMCP
@@ -82,11 +83,15 @@ logger.info("Environment loaded and logging configured")
 USE_SSE = os.getenv("USE_SSE", "false").lower() == "true"
 
 # Initialize MetadataReturner with split input/dist directories
-metadata_returner = MetadataReturner(
-    metadata_input_dir=os.getenv("INPUT_METADATA_DIR"),
-    metadata_dist_dir=os.getenv("DIST_METADATA_DIR"),
-    logger=logger  # Передаем настроенный логгер
-)
+try:
+    metadata_returner = MetadataReturner(
+        metadata_input_dir=os.getenv("INPUT_METADATA_DIR"),
+        metadata_dist_dir=os.getenv("DIST_METADATA_DIR"),
+    )
+    logger.info("MetadataReturner initialized successfully")
+except Exception as e:
+    logger.error(f"Failed to initialize MetadataReturner: {e}")
+    metadata_returner = None
 
 # Initialize FastMCP server at module level
 mcp = FastMCP()
@@ -98,7 +103,7 @@ def metadatasearch(
     query: str, find_usages: bool = False, limit: int = 5, config: str = None
 ):
     """
-    Search metadata files of 1C configuration. Example: 'Справочники.Номенклатура'.
+    Search metadata files of 1C configuration. Example: 'Справочники.Номенклатура' or 'Заказ покупателя'
     :param query: Search string, e.g. `Документ.Счет`. Use singular type when possible
     :param find_usages: Reserved for future feature (find usages). Currently unused
     :param limit: Max number of results (default 5)
@@ -106,20 +111,66 @@ def metadatasearch(
                    or values of `Имя`/`Синоним` from metadata index
     :return: Dict with status and result payload
     """
-    # Log the call parameters
+    # Log function entry
+    logger.info("=== metadatasearch function called ===")
+    logger.info(f"Function called at: {__name__}")
+    
+    # Log the call parameters with detailed info
     logger.info(
-        "metadatasearch called with query=%r, find_usages=%s, limit=%s, config=%r",
-        query, find_usages, limit, config
+        "Parameters: query=%r (type: %s), find_usages=%r (type: %s), limit=%r (type: %s), config=%r (type: %s)",
+        query, type(query).__name__, 
+        find_usages, type(find_usages).__name__, 
+        limit, type(limit).__name__, 
+        config, type(config).__name__
     )
     
-    result = metadata_returner.search_metadata(
-        query, find_usages=find_usages, limit=limit, config=config
-    )
+    # Log stack trace to see where we are
+    import traceback
+    logger.info(f"Stack trace: {traceback.format_stack()}")
     
-    # Log the result status
-    logger.info("metadatasearch completed with status: %s", result.get("status", "unknown"))
+    # Log environment variables for debugging
+    logger.debug("Environment variables: INPUT_METADATA_DIR=%r, DIST_METADATA_DIR=%r", 
+                os.getenv("INPUT_METADATA_DIR"), os.getenv("DIST_METADATA_DIR"))
     
-    return result
+    # Check if MetadataReturner is available
+    if metadata_returner is None:
+        error_result = {
+            "_call_params": {
+                "query": query,
+                "find_usages": find_usages,
+                "limit": limit,
+                "config": config,
+                "timestamp": None
+            },
+            "status": "error",
+            "result": {"text": "MetadataReturner не инициализирован. Проверьте логи сервера."}
+        }
+        logger.error("MetadataReturner is not available")
+        return error_result
+    
+    try:
+        result = metadata_returner.search_metadata(
+            query, find_usages=find_usages, limit=limit, config=config
+        )
+        
+        # Log the result status
+        logger.info("metadatasearch completed with status: %s", result.get("status", "unknown"))
+        
+        return result
+    except Exception as e:
+        logger.error(f"Error in metadatasearch: {e}", exc_info=True)
+        error_result = {
+            "_call_params": {
+                "query": query,
+                "find_usages": find_usages,
+                "limit": limit,
+                "config": config,
+                "timestamp": None
+            },
+            "status": "error",
+            "result": {"text": f"Внутренняя ошибка сервера: {str(e)}"}
+        }
+        return error_result
 
 
 if __name__ == "__main__":
@@ -131,4 +182,15 @@ if __name__ == "__main__":
     logger.info(
         f"Starting MCP server with transport={transport}, host={host}, port={port}, path={path}"
     )
-    mcp.run(transport=transport, host=host, port=port, path=path)
+    
+    # Log current working directory and environment
+    logger.info(f"Current working directory: {os.getcwd()}")
+    logger.info(f"Python executable: {os.sys.executable}")
+    logger.info(f"Python version: {os.sys.version}")
+    
+    try:
+        logger.info("Starting MCP server...")
+        mcp.run(transport=transport, host=host, port=port, path=path)
+    except Exception as e:
+        logger.error(f"Failed to start MCP server: {e}", exc_info=True)
+        raise
